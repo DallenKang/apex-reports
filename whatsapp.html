@@ -50,14 +50,14 @@
   <div class="card">
     <h2>2. 写信息内容</h2>
     <p class="hint">用 <code>{标题}</code> 放入每个人的资料，例如 <code>{名字}</code>、<code>{日期}</code>。</p>
-    <textarea id="tpl">您好 {名字}，提醒您的 contra 将于 {日期} 到期，请留意。如有疑问请联系我。谢谢！</textarea>
+    <textarea id="tpl">您好 {名字}，提醒您的 contra 将于 {日期} 到期，请留意。如有疑问请联系我 018-320 9696（APEX Molek 分行）。谢谢！</textarea>
     <button class="btn" onclick="build()">生成发送名单</button>
     <button class="btn ghost" onclick="resetSent()">清除"已发送"记录</button>
   </div>
 
   <div class="card" id="out" style="display:none">
     <h2>3. 逐个点击发送</h2>
-    <p class="hint">点 <b>发送</b> 会打开 WhatsApp，信息已经填好，只要按发送键。每条之间建议间隔几秒，不要一口气发几百条。</p>
+    <p class="hint">⚠️ 请确认手机或电脑上登入的是 <b>018-320 9696</b> 的 WhatsApp，信息会从当时登入的号码发出。<br>点 <b>发送</b> 会打开 WhatsApp，信息已经填好，只要按发送键。每条之间建议间隔几秒，不要一口气发几百条。</p>
     <div class="stats" id="stats"></div>
     <div id="rows"></div>
   </div>
