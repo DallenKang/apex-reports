@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-blaster",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "用 018 客服号批量发送 WhatsApp 提醒（Baileys）",
+  "scripts": {
+    "start": "node send.js",
+    "preview": "node send.js --dry"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "exceljs": "^4.4.0",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
