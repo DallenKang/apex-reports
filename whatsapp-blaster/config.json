@@ -2,8 +2,30 @@
   "senderPhone": "018-320 9696",
   "loginWithPairingCode": false,
   "dailyLimit": 10,
-  "delaySeconds": [20, 45],
+  "delaySeconds": [
+    20,
+    45
+  ],
   "breakEvery": 30,
-  "breakMinutes": [5, 10],
-  "officialApiRateMYR": { "utility": 0.0564, "marketing": 0.3467 }
+  "breakMinutes": [
+    5,
+    10
+  ],
+  "officialApiRateMYR": {
+    "utility": 0.0564,
+    "marketing": 0.3467
+  },
+  "autoReply": {
+    "enabled": true,
+    "channelLink": "在这里贴上 https://whatsapp.com/channel/... 链接",
+    "keywords": [
+      "1",
+      "１",
+      "yes",
+      "ok",
+      "要",
+      "有兴趣",
+      "interested"
+    ]
+  }
 }

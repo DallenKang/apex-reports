@@ -1,1 +1,1 @@
-您好 {名字}，我是 APEX Securities Molek 分行。提醒您的 contra 将于 {日期} 到期，请留意。如有疑问请联系 018-320 9696。谢谢！
+您好 {名字}，我是 APEX Securities Molek 分行。我们开了 WhatsApp 频道，每天分享股市资讯。有兴趣的话请回复 1，我发链接给您 😊

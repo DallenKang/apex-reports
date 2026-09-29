@@ -6,7 +6,8 @@
   "description": "用 018 客服号批量发送 WhatsApp 提醒（Baileys）",
   "scripts": {
     "start": "node send.js",
-    "preview": "node send.js --dry"
+    "preview": "node send.js --dry",
+    "listen": "node send.js --listen"
   },
   "dependencies": {
     "baileys": "7.0.0-rc14",

@@ -1,6 +1,7 @@
 // 用 WhatsApp（Baileys）按名单自动发送提醒
 //   npm start 名单.xlsx          正式发送
 //   npm run preview 名单.xlsx    只预览信息，不登入、不发送
+//   npm run listen               只开着等客户回复，自动发 Channel 链接
 import fs from 'node:fs';
 import path from 'node:path';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers } from 'baileys';
@@ -11,6 +12,7 @@ import qrcode from 'qrcode-terminal';
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const CONFIG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
 const TEMPLATE = fs.readFileSync(path.join(DIR, 'message.txt'), 'utf8').trim();
+const REPLY_TEMPLATE = fs.readFileSync(path.join(DIR, 'reply.txt'), 'utf8').trim();
 const LOG_FILE = path.join(DIR, 'sent-log.csv');
 const PHONE_KEYS = ['电话', '号码', '手机', 'phone', 'hp', 'tel', 'mobile', 'nombor'];
 
@@ -94,12 +96,46 @@ function buildJobs(rows) {
   return { jobs, bad, skipped };
 }
 
+let SOCK; // 当前连线（断线重连后会换新的）
+
+const autoReplyOn = () => CONFIG.autoReply?.enabled && /^https:\/\/whatsapp\.com\/channel\//.test(CONFIG.autoReply.channelLink || '');
+const replyText = () => REPLY_TEMPLATE.replace(/\{链接\}/g, CONFIG.autoReply.channelLink);
+
+// 客户回复关键字（例如 "1"）→ 自动发 Channel 链接，每人只发一次
+function attachAutoReply(sock) {
+  if (!autoReplyOn()) return;
+  const keywords = CONFIG.autoReply.keywords.map(k => k.toLowerCase());
+  const replied = new Set(readLog().filter(r => r.status === 'link_sent').map(r => r.phone));
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    for (const msg of messages) {
+      const jid = msg.key.remoteJid || '';
+      if (msg.key.fromMe || !/@(s\.whatsapp\.net|lid)$/.test(jid)) continue; // 不理群组、频道、状态
+      const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim().toLowerCase();
+      if (!keywords.includes(text.replace(/[。.!！~\s]+$/, ''))) continue;
+      const who = (msg.key.remoteJidAlt || jid).split('@')[0].split(':')[0];
+      if (replied.has(who)) continue;
+      replied.add(who);
+      try {
+        await sleep(randomBetween(3000, 8000));
+        await sock.sendMessage(jid, { text: replyText() });
+        writeLog(who, msg.pushName || '', 'link_sent');
+        console.log(`↩ ${msg.pushName || who} 回复了"${text}"，已自动发 Channel 链接`);
+      } catch (err) {
+        replied.delete(who);
+        console.log(`↩ 自动回复 ${who} 失败：${err.message}`);
+      }
+    }
+  });
+}
+
 function connect() {
   return new Promise(async (resolve, reject) => {
     const { state, saveCreds } = await useMultiFileAuthState(path.join(DIR, 'auth'));
     const sock = makeWASocket({ auth: state, logger: pino({ level: 'silent' }), browser: Browsers.windows('Chrome') });
     let pairingRequested = false;
     sock.ev.on('creds.update', saveCreds);
+    attachAutoReply(sock);
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         if (CONFIG.loginWithPairingCode && !pairingRequested) {
@@ -111,7 +147,7 @@ function connect() {
           qrcode.generate(qr, { small: true });
         }
       }
-      if (connection === 'open') resolve(sock);
+      if (connection === 'open') { SOCK = sock; resolve(sock); }
       if (connection === 'close') {
         const code = lastDisconnect?.error?.output?.statusCode;
         if (code === DisconnectReason.loggedOut) {
@@ -124,9 +160,21 @@ function connect() {
   });
 }
 
+async function listenForever() {
+  if (!autoReplyOn()) {
+    console.log('自动回复没开：请在 config.json 的 autoReply 填上 channelLink（https://whatsapp.com/channel/...），enabled 设为 true。');
+    process.exit(0);
+  }
+  console.log(`\n自动回复开着：客户回复 ${CONFIG.autoReply.keywords.join(' / ')} 就会收到 Channel 链接。`);
+  console.log('程序开着才会回复，按 Ctrl+C 结束。');
+  await new Promise(() => {});
+}
+
 async function main() {
   const dry = process.argv.includes('--dry');
+  const listenOnly = process.argv.includes('--listen');
   const file = process.argv.slice(2).find(a => !a.startsWith('--'));
+  if (listenOnly) { await connect(); return listenForever(); }
   if (!file) { console.log('用法：npm start 名单.xlsx   （或 npm run preview 名单.xlsx 先预览）'); process.exit(1); }
 
   const { jobs, bad, skipped } = buildJobs(await readRows(file));
@@ -145,17 +193,20 @@ async function main() {
     console.log(`  推广类 Marketing 约 RM ${(jobs.length * r.marketing).toFixed(2)}（每条 RM ${r.marketing}）`);
     for (const j of batch.slice(0, 5)) console.log(`\n→ +${j.phone} ${j.name}\n${j.text}`);
     if (batch.length > 5) console.log(`\n……还有 ${batch.length - 5} 条`);
+    if (autoReplyOn()) console.log(`\n客户回复 ${CONFIG.autoReply.keywords.join(' / ')} 时，自动回复：\n${replyText()}`);
+    else console.log('\n（自动回复还没开：config.json 的 autoReply 要填 channelLink 并把 enabled 设为 true）');
     return;
   }
-  if (!batch.length) return;
+  if (!batch.length && !autoReplyOn()) return;
 
-  let sock = await connect();
+  await connect();
   console.log('已登入，开始发送。按 Ctrl+C 可随时停止，下次运行会从没发的继续。\n');
 
   let sent = 0;
   for (const [i, job] of batch.entries()) {
     const tag = `[${i + 1}/${batch.length}] +${job.phone} ${job.name}`;
     try {
+      const sock = SOCK;
       const [result] = await sock.onWhatsApp(job.phone);
       if (!result?.exists) { writeLog(job.phone, job.name, 'not_on_whatsapp'); console.log(`${tag}  ✗ 没有 WhatsApp`); continue; }
       await sock.sendPresenceUpdate('composing', result.jid);
@@ -181,6 +232,7 @@ async function main() {
   console.log(`\n完成：这次发出 ${sent} 条。记录在 sent-log.csv`);
   if (jobs.length > batch.length) console.log(`还有 ${jobs.length - batch.length} 人没发（到了每日上限），明天再运行同一个名单就会继续。`);
   await sleep(3000); // 让最后一条信息送出
+  if (autoReplyOn()) return listenForever();
   process.exit(0);
 }
 
