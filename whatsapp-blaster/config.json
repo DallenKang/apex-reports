@@ -1,7 +1,7 @@
 {
   "senderPhone": "018-320 9696",
   "loginWithPairingCode": false,
-  "dailyLimit": 200,
+  "dailyLimit": 10,
   "delaySeconds": [20, 45],
   "breakEvery": 30,
   "breakMinutes": [5, 10],
